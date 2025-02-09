@@ -27,7 +27,7 @@
             border-radius: 12px 12px 0 0;
         }
         .chat-messages {
-            height: 380px;
+            height: 370px;
             overflow-y: auto;
             padding: 20px;
             background: white;
@@ -79,7 +79,7 @@
         <!-- User Info Input Section -->
         <div class="input-container">
             <input type="text" id="user-name" placeholder="Enter your name">
-            <!-- Added oninput to restrict non-numeric input -->
+            <!-- Restrict non-numeric input -->
             <input type="text" id="employee-number" placeholder="Enter your Employee Number" oninput="validateEmployeeNumber(this)">
             <button onclick="saveUserInfo()">Start Chat</button>
         </div>
@@ -166,6 +166,7 @@
             const normalizedInput = userInput.toLowerCase().trim();
             let foundJurisdiction = null;
 
+            // Look for a match anywhere in the user's query
             for (const key in jurisdictionData) {
                 if (normalizedInput.includes(key.toLowerCase())) {
                     foundJurisdiction = jurisdictionData[key];
@@ -174,12 +175,24 @@
             }
 
             if (foundJurisdiction) {
-                const response = `
-                    <strong>${foundJurisdiction.country} (${foundJurisdiction.code})</strong><br>
-                    <b>Automatic TIN Issuance:</b> ${foundJurisdiction.automaticTIN || 'Not available'}<br>
-                    <b>TIN Type:</b> ${foundJurisdiction.tinType || 'Not available'}<br>
-                    <b>More Info:</b> <a href="${foundJurisdiction.reference}" target="_blank">Click here</a>
-                `;
+                // Define the order of headers as per the XML header row
+                const headers = [
+                    "Jurisdiction",
+                    "Country code",
+                    "Automatically issues TIN to all individual tax residents?",
+                    "TIN",
+                    "TIN Equivalent (if any)",
+                    "Where to find TIN or TIN equivalent",
+                    "Reference"
+                ];
+                let response = "";
+                headers.forEach(header => {
+                    if (header === "Reference") {
+                        response += `<b>${header}:</b> <a href="${foundJurisdiction[header]}" target="_blank">Click here</a><br>`;
+                    } else {
+                        response += `<b>${header}:</b> ${foundJurisdiction[header] || "Not available"}<br>`;
+                    }
+                });
                 messages.appendChild(createMessageElement(response));
             } else {
                 messages.appendChild(createMessageElement("I couldn't find a jurisdiction in your query. Please try again with a country name."));
@@ -198,24 +211,32 @@
 
                     for (let i = 0; i < records.length; i++) {
                         const row = records[i];
-                        const country = row.getAttribute("A").trim();
-                        // Use fallback values in case any attribute is missing
+                        // Skip the header row if detected (where attribute A equals "Jurisdiction")
+                        const jurisdictionName = row.getAttribute("A")?.trim();
+                        if (!jurisdictionName || jurisdictionName.toLowerCase() === "jurisdiction") continue;
+
+                        // Extract all attributes with fallback values
                         const code = row.getAttribute("B") ? row.getAttribute("B").trim() : "N/A";
                         const automaticTIN = row.getAttribute("C") ? row.getAttribute("C").trim() : "Not available";
-                        const tinType = row.getAttribute("D") ? row.getAttribute("D").trim() : "Not available";
+                        const tin = row.getAttribute("D") ? row.getAttribute("D").trim() : "Not available";
+                        const tinEquivalent = row.getAttribute("E") ? row.getAttribute("E").trim() : "Not available";
+                        const whereToFindTIN = row.getAttribute("F") ? row.getAttribute("F").trim() : "Not available";
                         const reference = row.getAttribute("G") ? row.getAttribute("G").trim() : "#";
 
-                        // Save using lower-case key for easier matching
-                        jurisdictionData[country.toLowerCase()] = {
-                            country,
-                            code,
-                            automaticTIN,
-                            tinType,
-                            reference
+                        // Save data using a key of the lower-case jurisdiction name
+                        jurisdictionData[jurisdictionName.toLowerCase()] = {
+                            "Jurisdiction": jurisdictionName,
+                            "Country code": code,
+                            "Automatically issues TIN to all individual tax residents?": automaticTIN,
+                            "TIN": tin,
+                            "TIN Equivalent (if any)": tinEquivalent,
+                            "Where to find TIN or TIN equivalent": whereToFindTIN,
+                            "Reference": reference
                         };
 
+                        // Populate the datalist for suggestions
                         const option = document.createElement("option");
-                        option.value = country;
+                        option.value = jurisdictionName;
                         datalist.appendChild(option);
                     }
                 })
