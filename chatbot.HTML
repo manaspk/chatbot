@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RCU CRS TIN Advisory Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: white;
+            color: #333333;
+        }
+
+        .chat-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: grey;
+            border-radius: 12px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+
+        .chat-header {
+            background-color: #cf2e2e;
+            color: white;
+            padding: 15px;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+        }
+
+        .bot-message {
+            background-color: #f5f5f5;
+            margin-right: 20%;
+        }
+
+        .input-container {
+            margin-top: 10px;
+        }
+
+        input[type="text"], datalist {
+            width: calc(100% - 90px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 10px;
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #34495e;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>RCU CRS TIN Advisory Chatbot</h2>
+        </div>
+
+        <div class="input-container">
+            <input type="text" id="user-name" placeholder="Enter your name">
+            <input type="text" id="employee-number" placeholder="Enter your Employee Number">
+            <button onclick="saveUserInfo()">Start Chat</button>
+        </div>
+
+        <div class="chat-messages" id="chat-messages"></div>
+
+        <div class="input-container">
+            <input type="text" id="jurisdiction-search" list="jurisdictions" placeholder="Enter jurisdiction name">
+            <datalist id="jurisdictions"></datalist>
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let userName = "";
+        let employeeNumber = "";
+        let jurisdictionData = {};
+
+        function saveUserInfo() {
+            userName = document.getElementById("user-name").value.trim();
+            employeeNumber = document.getElementById("employee-number").value.trim();
+
+            if (!userName || !employeeNumber) {
+                alert("Please enter your name and employee number.");
+                return;
+            }
+
+            const messages = document.getElementById('chat-messages');
+            messages.innerHTML = ""; // Clear previous messages
+
+            messages.appendChild(createMessageElement(
+                "Hello, I am the TIN Advisory Bot, expertly trained to assist with TIN information for CRS purposes. " +
+                "Please enter the jurisdiction name for which you require a TIN."
+            ));
+
+            alert(`Welcome, ${userName}! You can now chat.`);
+        }
+
+        function createMessageElement(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            messageDiv.innerHTML = text;
+            return messageDiv;
+        }
+
+        function sendMessage() {
+            const jurisdiction = document.getElementById("jurisdiction-search").value.trim();
+
+            if (!userName || !employeeNumber) {
+                alert("Please enter your name and employee number first.");
+                return;
+            }
+            if (!jurisdiction) {
+                alert("Please enter a jurisdiction.");
+                return;
+            }
+
+            const messages = document.getElementById('chat-messages');
+            messages.appendChild(createMessageElement(`Query: ${jurisdiction}`, true));
+
+            // Simulate bot typing
+            messages.appendChild(createMessageElement("Bot is typing...", false));
+            setTimeout(() => {
+                messages.lastChild.remove();
+                showResponse(jurisdiction);
+                messages.scrollTop = messages.scrollHeight;
+            }, 1000);
+        }
+
+        function showResponse(jurisdiction) {
+            const messages = document.getElementById('chat-messages');
+
+            if (jurisdictionData[jurisdiction]) {
+                const data = jurisdictionData[jurisdiction];
+                const response = `
+                    <strong>${data.country} (${data.code})</strong><br>
+                    <b>Automatic TIN Issuance:</b> ${data.automaticTIN || 'Not available'}<br>
+                    <b>TIN Type:</b> ${data.tinType || 'Not available'}<br>
+                    <b>More Info:</b> <a href="${data.reference}" target="_blank">Click here</a>
+                `;
+                messages.appendChild(createMessageElement(response));
+            } else {
+                messages.appendChild(createMessageElement("Jurisdiction not found. Please enter a valid jurisdiction."));
+            }
+        }
+
+        function loadXMLData() {
+            fetch("XML Final Version.xml")
+                .then(response => response.text())
+                .then(str => {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(str, "text/xml");
+                    const records = xmlDoc.getElementsByTagName("Row");
+                    const datalist = document.getElementById("jurisdictions");
+
+                    for (let i = 0; i < records.length; i++) {
+                        const row = records[i];
+                        const country = row.getAttribute("A").trim();
+                        const code = row.getAttribute("B").trim();
+                        const automaticTIN = row.getAttribute("C").trim();
+                        const tinType = row.getAttribute("D").trim();
+                        const reference = row.getAttribute("G").trim();
+
+                        jurisdictionData[country] = {
+                            country,
+                            code,
+                            automaticTIN,
+                            tinType,
+                            reference
+                        };
+
+                        const option = document.createElement("option");
+                        option.value = country;
+                        datalist.appendChild(option);
+                    }
+                })
+                .catch(error => console.error("Error loading XML data:", error));
+        }
+
+        window.onload = loadXMLData;
+    </script>
+
+</body>
+</html>
